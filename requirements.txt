@@ -1,0 +1,10 @@
+playwright>=1.40
+readability-lxml>=0.8
+markdownify>=0.12
+sentence-transformers>=2.2
+fastmcp>=0.1
+numpy
+lxml
+cssselect
+uvicorn
+fastapi

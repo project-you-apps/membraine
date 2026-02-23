@@ -1,0 +1,193 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-02-22",
+  "description": "Membraine threat signatures -- prompt injection patterns for LLM agent defense",
+  "signatures": [
+    {
+      "category": "role_hijack",
+      "name": "role_hijack_system",
+      "pattern": "(?:^|\\n)\\s*system\\s*:",
+      "description": "Attempts to inject a system-role message"
+    },
+    {
+      "category": "role_hijack",
+      "name": "role_hijack_assistant",
+      "pattern": "(?:^|\\n)\\s*assistant\\s*:",
+      "description": "Attempts to inject an assistant-role message"
+    },
+    {
+      "category": "role_hijack",
+      "name": "role_hijack_human",
+      "pattern": "(?:^|\\n)\\s*human\\s*:",
+      "description": "Attempts to inject a human-role message"
+    },
+    {
+      "category": "role_hijack",
+      "name": "role_hijack_user",
+      "pattern": "(?:^|\\n)\\s*user\\s*:",
+      "description": "Attempts to inject a user-role message"
+    },
+    {
+      "category": "format_injection",
+      "name": "chatml_injection",
+      "pattern": "<\\|im_start\\|>",
+      "description": "OpenAI ChatML start token injection"
+    },
+    {
+      "category": "format_injection",
+      "name": "chatml_injection",
+      "pattern": "<\\|im_end\\|>",
+      "description": "OpenAI ChatML end token injection"
+    },
+    {
+      "category": "format_injection",
+      "name": "chatml_injection",
+      "pattern": "<\\|endoftext\\|>",
+      "description": "OpenAI end-of-text token injection"
+    },
+    {
+      "category": "format_injection",
+      "name": "inst_injection",
+      "pattern": "\\[INST\\]",
+      "description": "Llama/Mistral instruction start tag injection"
+    },
+    {
+      "category": "format_injection",
+      "name": "inst_injection",
+      "pattern": "\\[/INST\\]",
+      "description": "Llama/Mistral instruction end tag injection"
+    },
+    {
+      "category": "format_injection",
+      "name": "sys_injection",
+      "pattern": "<<SYS>>",
+      "description": "Llama system prompt start tag injection"
+    },
+    {
+      "category": "format_injection",
+      "name": "sys_injection",
+      "pattern": "<</SYS>>",
+      "description": "Llama system prompt end tag injection"
+    },
+    {
+      "category": "format_injection",
+      "name": "anthropic_injection",
+      "pattern": "\\bHuman\\s*:",
+      "description": "Anthropic Human turn marker injection"
+    },
+    {
+      "category": "format_injection",
+      "name": "anthropic_injection",
+      "pattern": "\\bAssistant\\s*:",
+      "description": "Anthropic Assistant turn marker injection"
+    },
+    {
+      "category": "instruction_override",
+      "name": "ignore_previous",
+      "pattern": "ignore\\s+(?:all\\s+)?previous\\s+instructions?",
+      "description": "Ignore previous instructions directive"
+    },
+    {
+      "category": "instruction_override",
+      "name": "ignore_previous",
+      "pattern": "ignore\\s+(?:all\\s+)?(?:above|prior)\\s+(?:instructions?|context)",
+      "description": "Ignore above/prior instructions directive"
+    },
+    {
+      "category": "instruction_override",
+      "name": "ignore_previous",
+      "pattern": "disregard\\s+(?:all\\s+)?(?:previous|above|prior)\\s+instructions?",
+      "description": "Disregard previous instructions directive"
+    },
+    {
+      "category": "instruction_override",
+      "name": "ignore_previous",
+      "pattern": "forget\\s+(?:all\\s+)?(?:previous|above|prior|your)\\s+instructions?",
+      "description": "Forget previous instructions directive"
+    },
+    {
+      "category": "persona_override",
+      "name": "persona_override",
+      "pattern": "you\\s+are\\s+now\\s+(?:a|an|the)\\b",
+      "description": "Persona reassignment attempt"
+    },
+    {
+      "category": "persona_override",
+      "name": "persona_override",
+      "pattern": "you\\s+must\\s+now\\s+(?:act|behave|respond)\\s+as",
+      "description": "Forced behavior change attempt"
+    },
+    {
+      "category": "persona_override",
+      "name": "persona_override",
+      "pattern": "from\\s+now\\s+on\\s*,?\\s*you\\s+(?:are|will|must|should)",
+      "description": "Persistent persona override attempt"
+    },
+    {
+      "category": "instruction_override",
+      "name": "new_instructions",
+      "pattern": "new\\s+instructions?\\s*:",
+      "description": "New instructions injection"
+    },
+    {
+      "category": "instruction_override",
+      "name": "new_instructions",
+      "pattern": "updated?\\s+instructions?\\s*:",
+      "description": "Updated instructions injection"
+    },
+    {
+      "category": "instruction_override",
+      "name": "new_instructions",
+      "pattern": "override\\s+instructions?\\s*:",
+      "description": "Override instructions injection"
+    },
+    {
+      "category": "instruction_override",
+      "name": "override_attempt",
+      "pattern": "do\\s+not\\s+follow\\s+(?:any\\s+)?(?:previous|prior|original)",
+      "description": "Instruction negation attempt"
+    },
+    {
+      "category": "forced_output",
+      "name": "forced_output",
+      "pattern": "(?:respond|reply|answer)\\s+(?:only\\s+)?with\\s+[\"']",
+      "description": "Forced output with quoted content"
+    },
+    {
+      "category": "forced_output",
+      "name": "forced_output",
+      "pattern": "output\\s+(?:only\\s+)?the\\s+following",
+      "description": "Forced output directive"
+    },
+    {
+      "category": "forced_output",
+      "name": "forced_output",
+      "pattern": "repeat\\s+after\\s+me\\s*:",
+      "description": "Parrot attack"
+    },
+    {
+      "category": "prompt_leak",
+      "name": "prompt_leak",
+      "pattern": "(?:reveal|show|display|print|output)\\s+(?:your|the|system)\\s+(?:system\\s+)?prompt",
+      "description": "System prompt extraction attempt"
+    },
+    {
+      "category": "prompt_leak",
+      "name": "prompt_leak",
+      "pattern": "what\\s+(?:is|are)\\s+your\\s+(?:system\\s+)?instructions",
+      "description": "Instruction extraction attempt"
+    },
+    {
+      "category": "html_injection",
+      "name": "html_comment_injection",
+      "pattern": "<!-- ?\\s*(?:instruction|inject|system|prompt)",
+      "description": "HTML comment with injection keywords"
+    },
+    {
+      "category": "html_injection",
+      "name": "html_comment_injection",
+      "pattern": "<!\\-\\-.*?(?:ignore|override|instruction).*?\\-\\->",
+      "description": "HTML comment containing override directives"
+    }
+  ]
+}
