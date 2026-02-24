@@ -38,6 +38,15 @@ mcp = FastMCP("Membraine")
 pipeline = MembrainePipeline()
 _start_time = time.time()
 
+# Pre-warm the Nomic embedding model so first web_fetch doesn't take 7 minutes
+try:
+    from chunker import _get_model
+    log.info("Pre-warming Nomic embedding model...")
+    _get_model()
+    log.info("Nomic model ready.")
+except Exception as e:
+    log.warning(f"Model pre-warm failed (will lazy-load on first fetch): {e}")
+
 
 # ---------------------------------------------------------------------------
 # MCP Tools
