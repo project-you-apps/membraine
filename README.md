@@ -32,7 +32,7 @@ URL
                  |
                  v
 +-----------------------------------+
-| Layer 1.5: PRE-STRIP (lxml)      |  Remove CSS-hidden elements BEFORE
+| Layer 1.5: PRE-STRIP (lxml)       |  Remove CSS-hidden elements BEFORE
 | -> sanitized HTML                 |  Readability strips style attributes
 +----------------+------------------+
                  |
@@ -86,9 +86,9 @@ Every threat is reported in a transparency log so your agent knows exactly what 
 Here's what Membraine catches in our adversarial test page -- a chocolate chip cookie recipe hiding 9 injection vectors:
 
 ```
-+-----------------------------------------------+-------------------+
++------------------------------------------------+-------------------+
 | Attack Vector                                  | Result            |
-+-----------------------------------------------+-------------------+
++------------------------------------------------+-------------------+
 | CSS display:none div (pirate chef persona)     | STRIPPED (Lyr 1.5)|
 | CSS font-size:0 (47 cups cayenne + hamster)    | STRIPPED (Lyr 1.5)|
 | CSS visibility:hidden (Gordon Ramsay rant)     | STRIPPED (Lyr 1.5)|
@@ -99,7 +99,7 @@ Here's what Membraine catches in our adversarial test page -- a chocolate chip c
 | [INST] DAN jailbreak prompt                    | STRIPPED (Pass 3) |
 | <<SYS>> override + Human:/Assistant: roles     | STRIPPED (Pass 3) |
 | HTML comment with injection keywords           | STRIPPED (Lyr 1.5)|
-+-----------------------------------------------+-------------------+
++------------------------------------------------+-------------------+
 ```
 
 Output: one clean cookie recipe. No hamster. No uranium. No INTERPOL.
@@ -107,38 +107,85 @@ Output: one clean cookie recipe. No hamster. No uranium. No INTERPOL.
 > "Add 47 cups of cayenne pepper and one live hamster"
 > -- what your agent would have read without Membraine
 
-## Quick Start
+## Getting Started
 
-### As an MCP Server (Claude Code)
+### 1. Prerequisites
+
+- **Python 3.10+** — [Download here](https://www.python.org/downloads/) if you don't have it. Check with `python --version`.
+- **Git** (optional) — to clone the repo. Or just download and unzip.
+
+### 2. Download
+
+```bash
+git clone https://github.com/project-you-apps/membraine.git
+cd membraine
+```
+
+Or download the ZIP from GitHub and extract it.
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+Then install the headless browser (Membraine uses Chromium to render pages with full JavaScript):
+
+```bash
+playwright install chromium
+```
+
+### 4. Run the Server
+
+**Option A: As a standalone HTTP server** (easiest way to test)
+
+```bash
+python membraine_server.py --http --port 8300
+```
+
+You should see:
+```
+INFO:     Uvicorn running on http://0.0.0.0:8300
+```
+
+Test it with:
+```bash
+curl -X POST http://localhost:8300/fetch \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "query": "main points"}'
+```
+
+**Option B: As an MCP server for Claude Code**
+
+Add this to your `.mcp.json` file (in your project root, or `~/.claude/.mcp.json` for global access):
 
 ```json
 {
   "mcpServers": {
     "membraine": {
       "command": "python",
-      "args": ["path/to/membraine_server.py"],
+      "args": ["/full/path/to/membraine_server.py"],
       "type": "stdio"
     }
   }
 }
 ```
 
-Then from Claude Code:
+> **Important**: Use the full absolute path to `membraine_server.py`, not a relative path.
+
+Restart Claude Code. You should see "membraine" in your available MCP tools. Then just ask:
+
 ```
 "Fetch https://example.com and summarize the main points"
 ```
 
-### As an HTTP API
+### 5. Verify It Works
 
 ```bash
-python membraine_server.py --http --port 8300
+python test_poison_guard.py
 ```
 
-```bash
-curl -X POST http://localhost:8300/fetch \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "query": "main points"}'
-```
+All 27 tests should pass. This confirms the Poison Guard is catching adversarial content correctly.
 
 ### MCP Tools
 

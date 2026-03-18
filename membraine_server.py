@@ -122,15 +122,11 @@ async def web_fetch_raw(url: str) -> str:
     }, indent=2, default=str)
 
 
-@mcp.tool()
-async def membraine_status() -> str:
-    """
-    Get Membraine server status: uptime, cache stats, browser state.
-    """
+def _get_status_dict() -> dict:
+    """Build status dict — shared by MCP tool and HTTP endpoint."""
     uptime = time.time() - _start_time
     cache = pipeline.cache_stats()
-
-    return json.dumps({
+    return {
         "server": "Membraine",
         "version": "0.1.0-practice",
         "uptime_s": round(uptime, 1),
@@ -143,7 +139,15 @@ async def membraine_status() -> str:
             "4: Poison Guard (adversarial filter)",
             "5: Chunk + Embed (Nomic v1.5)",
         ],
-    }, indent=2)
+    }
+
+
+@mcp.tool()
+async def membraine_status() -> str:
+    """
+    Get Membraine server status: uptime, cache stats, browser state.
+    """
+    return json.dumps(_get_status_dict(), indent=2)
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +206,7 @@ def create_http_app(port: int = 8300):
 
     @app.get("/status")
     async def http_status():
-        return json.loads(await membraine_status())
+        return _get_status_dict()
 
     return app, port
 
