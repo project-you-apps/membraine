@@ -248,6 +248,14 @@ Membraine runs hidden element stripping *before* Readability (Layer 1.5), while 
 
 MIT
 
+## Disclaimer
+
+Membraine is a defense-in-depth tool that reduces the risk of prompt injection from web content. **It does not guarantee complete protection.** Adversarial techniques evolve continuously, and no sanitization pipeline can catch every possible attack vector.
+
+This software is provided "as is" without warranty of any kind, express or implied. The authors and contributors are not liable for any damages, data loss, or security incidents arising from the use of this software. You are responsible for evaluating whether Membraine meets the security requirements of your specific use case.
+
+Membraine is not a substitute for other security practices such as input validation, output filtering, sandboxing, or human review of AI-generated actions. Use it as one layer in a broader security strategy.
+
 ## Credits
 
 Built by [Waving Cat Learning Systems](https://github.com/project-you-apps) as part of the Project-You neuromorphic memory platform.
