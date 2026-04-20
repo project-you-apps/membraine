@@ -25,8 +25,12 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from fastmcp import FastMCP
 from pipeline import MembrainePipeline
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 log = logging.getLogger("membraine")
 
 # ---------------------------------------------------------------------------
@@ -35,22 +39,25 @@ log = logging.getLogger("membraine")
 
 mcp = FastMCP("Membraine")
 
+
+def _cors_headers() -> dict:
+    """CORS headers for browser-extension callers (Heartbeat etc.)."""
+    return {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-client",
+    }
+
 pipeline = MembrainePipeline()
 _start_time = time.time()
 
-# Pre-warm the Nomic embedding model so first web_fetch doesn't take 7 minutes
-try:
-    from chunker import _get_model
-    log.info("Pre-warming Nomic embedding model...")
-    _get_model()
-    log.info("Nomic model ready.")
-except Exception as e:
-    log.warning(f"Model pre-warm failed (will lazy-load on first fetch): {e}")
+# Pre-warm is deferred to main() so stderr can be redirected first in stdio mode
 
 
 # ---------------------------------------------------------------------------
 # MCP Tools
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 async def web_fetch(url: str, query: str = "", top_k: int = 5) -> str:
@@ -110,16 +117,25 @@ async def web_fetch_raw(url: str) -> str:
     if result.error:
         return json.dumps({"error": result.error, "url": url}, indent=2)
 
-    return json.dumps({
-        "title": result.title,
-        "url": result.url,
-        "markdown": result.markdown,
-        "threats": [
-            {"category": t.category, "name": t.name, "context": t.context, "stripped": t.stripped}
-            for t in result.threats
-        ],
-        "meta": result.meta,
-    }, indent=2, default=str)
+    return json.dumps(
+        {
+            "title": result.title,
+            "url": result.url,
+            "markdown": result.markdown,
+            "threats": [
+                {
+                    "category": t.category,
+                    "name": t.name,
+                    "context": t.context,
+                    "stripped": t.stripped,
+                }
+                for t in result.threats
+            ],
+            "meta": result.meta,
+        },
+        indent=2,
+        default=str,
+    )
 
 
 def _get_status_dict() -> dict:
@@ -154,46 +170,69 @@ async def membraine_status() -> str:
 # HTTP mode (FastAPI mount for direct API access)
 # ---------------------------------------------------------------------------
 
-def create_http_app(port: int = 8300):
-    """Create FastAPI app with MCP mounted + REST endpoints."""
-    from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
-    import uvicorn
 
-    app = FastAPI(title="Membraine", version="0.1.0")
+# ---------------------------------------------------------------------------
+# REST endpoints — mounted on the same ASGI app as the MCP-SSE transport via
+# FastMCP custom_route. Available whether the server runs in --sse or --http
+# mode, so Heartbeat's RECEIVE command + boot-report health checks work in
+# both cases (same pattern membot uses for /api/filter and /api/search).
+# ---------------------------------------------------------------------------
 
-    # Health check
-    @app.get("/health")
-    async def health():
-        return {"status": "ok", "server": "Membraine"}
 
-    # REST endpoints (bypass MCP for direct HTTP access)
-    @app.post("/fetch")
-    async def http_fetch(request: dict):
-        url = request.get("url", "")
-        query = request.get("query", "")
-        top_k = request.get("top_k", 5)
+@mcp.custom_route("/health", methods=["GET", "OPTIONS"])
+async def http_health(request: Request) -> JSONResponse:
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=_cors_headers())
+    return JSONResponse({"status": "ok", "server": "Membraine"}, headers=_cors_headers())
 
-        if not url:
-            return JSONResponse({"error": "url required"}, status_code=400)
 
-        if not url.startswith(("http://", "https://")):
-            url = "https://" + url
+@mcp.custom_route("/status", methods=["GET", "OPTIONS"])
+async def http_status(request: Request) -> JSONResponse:
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=_cors_headers())
+    return JSONResponse(_get_status_dict(), headers=_cors_headers())
 
-        result = await pipeline.process(url, query=query, top_k=top_k)
-        return result.to_dict()
 
-    @app.post("/fetch_raw")
-    async def http_fetch_raw(request: dict):
-        url = request.get("url", "")
-        if not url:
-            return JSONResponse({"error": "url required"}, status_code=400)
+@mcp.custom_route("/fetch", methods=["POST", "OPTIONS"])
+async def http_fetch(request: Request) -> JSONResponse:
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=_cors_headers())
+    try:
+        data = await request.json()
+    except Exception as e:
+        return JSONResponse({"error": f"invalid JSON body: {e}"}, status_code=400, headers=_cors_headers())
 
-        if not url.startswith(("http://", "https://")):
-            url = "https://" + url
+    url = data.get("url", "")
+    query = data.get("query", "")
+    top_k = data.get("top_k", 5)
 
-        result = await pipeline.process_raw(url)
-        return {
+    if not url:
+        return JSONResponse({"error": "url required"}, status_code=400, headers=_cors_headers())
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    result = await pipeline.process(url, query=query, top_k=top_k)
+    return JSONResponse(result.to_dict(), headers=_cors_headers())
+
+
+@mcp.custom_route("/fetch_raw", methods=["POST", "OPTIONS"])
+async def http_fetch_raw(request: Request) -> JSONResponse:
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=_cors_headers())
+    try:
+        data = await request.json()
+    except Exception as e:
+        return JSONResponse({"error": f"invalid JSON body: {e}"}, status_code=400, headers=_cors_headers())
+
+    url = data.get("url", "")
+    if not url:
+        return JSONResponse({"error": "url required"}, status_code=400, headers=_cors_headers())
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    result = await pipeline.process_raw(url)
+    return JSONResponse(
+        {
             "title": result.title,
             "url": result.url,
             "markdown": result.markdown,
@@ -202,18 +241,15 @@ def create_http_app(port: int = 8300):
                 for t in result.threats
             ],
             "meta": result.meta,
-        }
-
-    @app.get("/status")
-    async def http_status():
-        return _get_status_dict()
-
-    return app, port
+        },
+        headers=_cors_headers(),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
+
 
 async def _shutdown():
     """Clean shutdown — close browser pool."""
@@ -226,24 +262,73 @@ async def _shutdown():
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Membraine — Secure Web Fetch MCP Server")
-    parser.add_argument("--http", action="store_true", help="Run in HTTP mode (default: stdio MCP)")
-    parser.add_argument("--port", type=int, default=8300, help="HTTP port (default 8300)")
-    parser.add_argument("--cache-ttl", type=int, default=900, help="Cache TTL in seconds (default 900)")
-    parser.add_argument("--cache-max", type=int, default=100, help="Max cache entries (default 100)")
+    parser = argparse.ArgumentParser(
+        description="Membraine — Secure Web Fetch MCP Server"
+    )
+    parser.add_argument(
+        "--http", action="store_true", help="Run in HTTP mode (default: stdio MCP)"
+    )
+    parser.add_argument(
+        "--sse",
+        action="store_true",
+        help="Run MCP over SSE (for VS Code / remote clients)",
+    )
+    parser.add_argument(
+        "--port", type=int, default=8300, help="HTTP/SSE port (default 8300)"
+    )
+    parser.add_argument(
+        "--cache-ttl", type=int, default=900, help="Cache TTL in seconds (default 900)"
+    )
+    parser.add_argument(
+        "--cache-max", type=int, default=100, help="Max cache entries (default 100)"
+    )
     args = parser.parse_args()
 
     # Configure cache
     pipeline._cache.ttl_seconds = args.cache_ttl
     pipeline._cache.max_entries = args.cache_max
 
-    if args.http:
-        import uvicorn
-        app, port = create_http_app(args.port)
-        log.info(f"Membraine HTTP server starting on port {port}")
-        uvicorn.run(app, host="0.0.0.0", port=port)
+    # Pre-warm the Nomic embedding model
+    def _prewarm():
+        try:
+            from chunker import _get_model
+
+            log.info("Pre-warming Nomic embedding model...")
+            _get_model()
+            log.info("Nomic model ready.")
+        except Exception as e:
+            log.warning(f"Model pre-warm failed (will lazy-load on first fetch): {e}")
+
+    if args.http or args.sse:
+        # Unified: both modes run the FastMCP app with custom_route REST
+        # endpoints mounted alongside the MCP transport. --http uses
+        # streamable-http MCP transport, --sse uses SSE. In both cases the
+        # REST routes (/health, /status, /fetch, /fetch_raw) are served at
+        # their plain paths — /mcp (http) or /sse (sse) is where the MCP
+        # protocol lives.
+        transport = "streamable-http" if args.http else "sse"
+        _prewarm()
+        log.info(
+            f"Membraine server starting on port {args.port} "
+            f"(transport={transport}, REST endpoints mounted: "
+            f"/health /status /fetch /fetch_raw)"
+        )
+        mcp.run(transport=transport, host="0.0.0.0", port=args.port)
     else:
+        # stdio mode: redirect ALL stderr to a log file so Claude Code
+        # doesn't interpret logging/banners as server errors
+        log_path = os.path.join(os.path.dirname(__file__) or ".", "membraine-stdio.log")
+        sys.stderr = open(log_path, "a")
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+        logging.basicConfig(
+            stream=sys.stderr,
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(message)s",
+        )
+        _prewarm()
         log.info("Membraine MCP server starting (stdio mode)")
         mcp.run(transport="stdio")
 
